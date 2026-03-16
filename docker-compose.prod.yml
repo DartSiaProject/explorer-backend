@@ -1,0 +1,162 @@
+version: '3.8' # Production configuration
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: dartsia-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-siaexplorer}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dartsia-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: dartsia-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - dartsia-network
+
+  explorer:
+    image: ghcr.io/poclus2/dartsia-backend:latest
+    container_name: dartsia-explorer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-siaexplorer}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SIA_API_URL: ${SIA_API_URL:-https://api.sia.tech}
+      SIA_EXPLORED_API: ${SIA_EXPLORED_API:-https://explorer.siagraph.info}
+    command: [ "node", "dist/apps/explorer/main.js" ]
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/v1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+    networks:
+      - dartsia-network
+
+  worker:
+    image: ghcr.io/poclus2/dartsia-backend:latest
+    container_name: dartsia-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-siaexplorer}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SIA_API_URL: ${SIA_API_URL:-https://api.sia.tech}
+      SIA_EXPLORED_API: ${SIA_EXPLORED_API:-https://explorer.siagraph.info}
+    command: [ "node", "dist/apps/worker/main.js" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep -f 'node dist/apps/worker/main.js' || exit 1" ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    networks:
+      - dartsia-network
+
+  analytics:
+    image: ghcr.io/poclus2/dartsia-backend:latest
+    container_name: dartsia-analytics
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-siaexplorer}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ANALYTICS_PORT: 3000 # Force internal port to 3000
+    command: [ "node", "dist/apps/analytics/main.js" ]
+    ports:
+      - "3002:3000"
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - dartsia-network
+
+  gateway:
+    image: ghcr.io/poclus2/dartsia-backend:latest
+    container_name: dartsia-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      EXPLORER_URL: http://explorer:3000
+      ANALYTICS_URL: http://analytics:3000 # Internal port 3000
+    command: [ "node", "dist/apps/gateway/main.js" ]
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    networks:
+      - dartsia-network
+
+networks:
+  dartsia-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:

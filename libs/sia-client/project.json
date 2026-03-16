@@ -1,0 +1,19 @@
+{
+  "name": "sia-client",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/sia-client/src",
+  "projectType": "library",
+  "tags": ["type:lib"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/sia-client",
+        "main": "libs/sia-client/src/index.ts",
+        "tsConfig": "libs/sia-client/tsconfig.lib.json",
+        "assets": ["libs/sia-client/*.md"]
+      }
+    }
+  }
+}
