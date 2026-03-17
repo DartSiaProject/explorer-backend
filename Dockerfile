@@ -14,6 +14,8 @@ RUN npm install --legacy-peer-deps
 COPY . .
 
 # Build all apps
+ENV NX_DAEMON=false
+RUN npx nx reset
 RUN npx nx run-many --target=build --all --prod
 
 # Production Runtime (Unified Image)
