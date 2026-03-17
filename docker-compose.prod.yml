@@ -35,6 +35,9 @@ services:
       - dartsia-network
 
   explorer:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ghcr.io/poclus2/dartsia-backend:latest
     container_name: dartsia-explorer
     restart: unless-stopped
@@ -68,6 +71,9 @@ services:
       - dartsia-network
 
   worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ghcr.io/poclus2/dartsia-backend:latest
     container_name: dartsia-worker
     restart: unless-stopped
@@ -99,6 +105,9 @@ services:
       - dartsia-network
 
   analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ghcr.io/poclus2/dartsia-backend:latest
     container_name: dartsia-analytics
     restart: unless-stopped
@@ -130,6 +139,9 @@ services:
       - dartsia-network
 
   gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: ghcr.io/poclus2/dartsia-backend:latest
     container_name: dartsia-gateway
     restart: unless-stopped
